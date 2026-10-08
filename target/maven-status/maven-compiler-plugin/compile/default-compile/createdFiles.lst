@@ -1,4 +1,8 @@
+com\metallurgy\auth\LoginRequest.class
+com\metallurgy\common\ApiResponse.class
 com\metallurgy\common\BusinessException.class
+com\metallurgy\config\MybatisConfig.class
+com\metallurgy\auth\AuthController.class
 com\metallurgy\config\WebConfig.class
 com\metallurgy\common\GlobalExceptionHandler.class
 com\metallurgy\MetallurgyApplication.class

@@ -1,0 +1,30 @@
+# Maven 构建产物
+target/
+*.class
+*.jar
+*.war
+
+# Maven 本地与临时文件
+.mvn/timing.properties
+release.properties
+dependency-reduced-pom.xml
+
+# IntelliJ IDEA / Eclipse 项目文件
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# 日志与运行时文件
+*.log
+logs/
+
+# 本地环境配置（保留 application.yml 模板）
+application-local.yml
+application-dev.yml
+.env
+.env.*
+!.env.example
