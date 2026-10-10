@@ -4,9 +4,9 @@ spring:
   application:
     name: metallurgy-procurement
   datasource:
-    url: jdbc:mysql://localhost:3306/metallurgy_procurement?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-    username: root
-    password: change-me
+    url: ${DB_URL:jdbc:mysql://localhost:3306/metallurgy_procurement?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:change-me}
     driver-class-name: com.mysql.cj.jdbc.Driver
 mybatis-plus:
   mapper-locations: classpath:/mapper/*.xml
@@ -15,3 +15,6 @@ mybatis-plus:
 logging:
   level:
     com.metallurgy: info
+jwt:
+  secret: ${JWT_SECRET:change-this-development-secret-to-a-long-random-value}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}

@@ -16,7 +16,7 @@
 
 ## 2. 认证
 
-### `POST /api/auth/login`（已实现：占位）
+### `POST /api/auth/login`
 
 请求：
 
@@ -27,21 +27,25 @@
 }
 ```
 
-`username`、`password` 必填且不可为空。当前实现仅校验 Bean Validation，并返回：
+`username`、`password` 必填且不可为空。登录成功返回 JWT 和当前用户概要：
 
 ```json
 {
   "code": 200,
   "msg": "success",
-  "data": { "message": "登录接口将在阶段 2 实现" }
+  "data": { "token": "<jwt>", "expiresIn": 86400000, "user": { "id": 1, "username": "admin", "email": "admin@example.com", "realName": "系统管理员", "role": "ADMIN", "permissions": ["dashboard:read"] } }
 }
 ```
 
-阶段 2 目标响应：`data.token`、`data.expiresIn`、`data.user`（`id`、`username`、`realName`、`role`）。前端当前登录页字段名为 `account`，接入时应映射为 `username`。
+前端登录页字段名为 `account`，请求时映射为 `username`。密码错误返回 401，停用账号返回 403。
 
-### `POST /api/auth/register`（规划中）
+### `POST /api/auth/register`
 
-请求字段：`username`、`email`、`password`；用户名和邮箱唯一，密码至少 6 位。成功返回创建后的用户概要，不返回密码。
+请求字段：`username`、`email`、`password`；用户名和邮箱唯一，密码至少 6 位。成功返回创建后的用户概要，不返回密码。重复用户名或邮箱返回 409。
+
+### `GET /api/auth/me` / `POST /api/auth/logout`
+
+除登录和注册外的认证接口均需 `Authorization: Bearer <jwt>`。`/me` 返回当前用户概要；`logout` 返回成功响应，前端随后清理本地 token。
 
 ## 3. 业务接口总览
 
