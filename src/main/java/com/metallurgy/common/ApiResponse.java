@@ -1,14 +1,10 @@
 package com.metallurgy.common;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-@Data @NoArgsConstructor @AllArgsConstructor
 public class ApiResponse<T> {
     private int code;
     private String msg;
     private T data;
+    public ApiResponse() {}
 
     /** 显式保留全参构造器，避免不同 JDK/Lombok 注解处理器组合下静态工厂无法推断构造方法。 */
     public ApiResponse(int code, String msg, T data) {

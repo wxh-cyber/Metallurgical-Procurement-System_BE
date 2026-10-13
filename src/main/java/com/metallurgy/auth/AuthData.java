@@ -1,10 +1,5 @@
 package com.metallurgy.auth;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-
-@Data
-@AllArgsConstructor
 public class AuthData {
     private String token;
     private long expiresIn;
