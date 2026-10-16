@@ -2,7 +2,7 @@
 
 本项目是“冶金企业原材料采购管理系统”的 Spring Boot 后端，面向钢铁等冶金企业的原材料采购、到货检验和库存管理场景。后端统一提供 REST API，并负责业务校验、数据库访问、异常处理以及后续的角色权限控制。
 
-当前代码处于阶段 1：已完成可扩展的后端工程骨架、数据库脚本和通用配置；登录及采购、检验、仓储等完整业务接口将在后续阶段逐步实现。
+当前已实现账号注册、用户名/邮箱登录、JWT 会话查询，以及物料、供应商和采购报表接口。采购计划、检验、仓储等业务接口仍按阶段逐步补齐。
 
 ## 技术栈
 
@@ -24,7 +24,8 @@
 - `BusinessException` 和全局异常处理器。
 - `/api/**` 跨域配置，允许本地前端开发服务器访问。
 - MyBatis-Plus MySQL 分页插件和下划线转驼峰配置。
-- `/api/auth/login` 登录接口形状占位，真实用户校验和 JWT 将在阶段 2 实现。
+- `/api/auth/register`、`/api/auth/login`、`/api/auth/me`、`/api/auth/logout` 认证接口；密码使用 BCrypt 存储，登录签发 JWT。
+- 物料与供应商管理接口，以及按年度聚合的采购报表接口。
 - 9 张核心业务表的建表脚本和初始化演示数据。
 
 ## 目录结构
@@ -80,36 +81,51 @@ backend/
 
 ### 1. 准备数据库
 
-先在 `application.yml` 中修改本机 MySQL 用户名和密码，然后执行：
+启动本机 MySQL 8.0，并使用有权创建数据库/表的账号执行脚本。先在系统终端进入仓库 `backend` 目录，再从该目录启动 MySQL 命令行客户端（例如 `mysql -u root -p`），然后在 MySQL 提示符中依次执行：
 
 ```sql
 SOURCE src/main/resources/db/schema.sql;
 SOURCE src/main/resources/db/data.sql;
 ```
 
+`schema.sql` 会创建 `metallurgy_procurement` 数据库及所需表，并包含 `sys_user.email` 等兼容迁移；`data.sql` 写入演示账号和业务数据。已有数据库也应先执行 `schema.sql`，确保旧表具备当前认证代码需要的列。
+
+若数据库已经初始化，只需补充其他物料的当年采购演示数据，可在 MySQL 提示符中单独执行 `SOURCE src/main/resources/db/demo_purchase_orders.sql;`。该脚本只写入两家缺失供应商和 7 条采购订单，订单编码固定并使用 `INSERT IGNORE`，可重复执行。
+
+后端默认连接 `localhost:3306/metallurgy_procurement`，默认用户名为 `root`。密码不会写在仓库中，必须通过运行进程的 `DB_PASSWORD` 环境变量提供；也可用 `DB_URL`、`DB_USERNAME` 覆盖默认地址和用户名。启动进程必须实际继承这些变量：在 IDE 中运行时，将它们配置到 Spring Boot Run Configuration 的 Environment variables；在 PowerShell 中可在同一窗口设置后启动：
+
+```powershell
+$env:DB_URL = 'jdbc:mysql://localhost:3306/metallurgy_procurement?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai'
+$env:DB_USERNAME = 'root'
+$env:DB_PASSWORD = '<本机 MySQL 密码>'
+mvn spring-boot:run
+```
+
+请把 `<本机 MySQL 密码>` 替换为本机值，不要提交到代码、README 或版本控制。若账号无密码，按本机 MySQL 安全策略设置空值；生产环境应使用专用、最小权限账号。
+
 ### 2. 启动后端
 
-在 `backend` 目录执行：
+先在 `backend` 目录启动后端：
 
 ```bash
 mvn spring-boot:run
 ```
 
-默认服务地址为 `http://localhost:8080`。
+默认服务地址为 `http://localhost:8080`。再在另一个终端进入同级 `frontend` 目录运行 `npm run dev`；Vite 会把 `/api` 请求代理到 `http://localhost:8080`。如果 8080 已被其他进程占用，先停止旧后端实例，或通过 `SERVER_PORT` 为后端指定其他端口并同步调整 `frontend/vite.config.js` 代理地址。
+
+注册/登录时报“数据库暂不可用”时，依次确认：MySQL 服务正在运行且 3306 可连接；`DB_URL` 指向正确数据库；`DB_USERNAME`/`DB_PASSWORD` 对应本机账号；已按顺序执行 `schema.sql`、`data.sql`；从 IDE 启动时环境变量已配置在该 IDE 的运行配置中。
 
 ## 后续开发计划
 
-1. 接入 BCrypt 用户查询、JWT 生成和拦截器。
-2. 实现物料档案、供应商管理 CRUD。
-3. 实现采购计划审批和计划转订单。
-4. 实现订单到货、检验自动判定、合格入库和库存联动。
-5. 实现领用出库、安全库存预警。
-6. 提供仪表盘和 ECharts 报表聚合接口。
-7. 完成端到端业务闭环联调。
+1. 实现采购计划审批和计划转订单。
+2. 实现订单到货、检验自动判定、合格入库和库存联动。
+3. 实现领用出库、安全库存预警。
+4. 补齐仪表盘和其他统计报表聚合接口。
+5. 完成端到端业务闭环联调。
 
 ## 当前限制
 
 - 项目不包含 Maven Wrapper，需要本机安装 Maven。
-- `application.yml` 中的数据库密码是示例配置，运行前必须替换为本机配置。
-- 阶段 1 的登录接口仅保留接口形状，尚未执行真实账号校验，也不会签发可用 JWT。
-- controller、service、entity 和 mapper 业务实现会在后续阶段补充。
+- 数据库连接密码必须由运行环境提供，仓库不包含本机或生产凭据。
+- 注册和登录依赖已初始化的 MySQL 表结构；唯一键是防止并发重复注册的最终保障。
+- 采购计划、检验和仓储等完整业务接口仍在后续阶段补充。

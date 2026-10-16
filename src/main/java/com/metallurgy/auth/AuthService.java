@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.metallurgy.common.BusinessException;
 import com.metallurgy.entity.SysUser;
 import com.metallurgy.mapper.SysUserMapper;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.Arrays;
@@ -19,7 +20,14 @@ public class AuthService {
     public AuthData register(RegisterRequest request) {
         if (userMapper.selectCount(new QueryWrapper<SysUser>().eq("username", request.getUsername())) > 0) throw new BusinessException(409, "用户名已存在");
         if (userMapper.selectCount(new QueryWrapper<SysUser>().eq("email", request.getEmail())) > 0) throw new BusinessException(409, "邮箱已存在");
-        SysUser user = new SysUser(); user.setUsername(request.getUsername()); user.setEmail(request.getEmail()); user.setPassword(passwordEncoder.encode(request.getPassword())); user.setRealName(request.getUsername()); user.setRole("PROCUREMENT"); user.setStatus(1); userMapper.insert(user);
+        SysUser user = new SysUser(); user.setUsername(request.getUsername()); user.setEmail(request.getEmail()); user.setPassword(passwordEncoder.encode(request.getPassword())); user.setRealName(request.getUsername()); user.setRole("PROCUREMENT"); user.setStatus(1);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException ex) {
+            if (userMapper.selectCount(new QueryWrapper<SysUser>().eq("username", request.getUsername())) > 0) throw new BusinessException(409, "用户名已存在");
+            if (userMapper.selectCount(new QueryWrapper<SysUser>().eq("email", request.getEmail())) > 0) throw new BusinessException(409, "邮箱已存在");
+            throw new BusinessException(409, "用户名或邮箱已存在");
+        }
         return new AuthData(null, 0, toAuthUser(user));
     }
 
