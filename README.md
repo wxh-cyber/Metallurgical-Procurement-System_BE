@@ -12,8 +12,9 @@
 - MyBatis-Plus 3.5.5
 - MySQL 8.0
 - Lombok
-- Spring Security Crypto（用于 BCrypt 密码处理）
-- JJWT 0.11.5（为后续 JWT 鉴权准备）
+- Spring Security Crypto（使用 BCrypt 进行密码哈希与校验）
+- JJWT 0.11.5（签发和解析 HS256 JWT）
+- Maven、JUnit 5、Mockito（构建与单元测试）
 
 项目不引入 Redis、消息队列、微服务、Docker 或 Spring Cloud，保持课程作业所需的简单部署方式。
 
@@ -28,6 +29,22 @@
 - 物料与供应商管理接口，以及按年度聚合的采购报表接口。
 - 9 张核心业务表的建表脚本和初始化演示数据。
 
+### 已实现功能说明
+
+#### 认证与会话
+
+- 注册：校验用户名和邮箱唯一性，默认创建 PROCUREMENT 角色、启用状态用户，并返回用户信息。
+- 登录：用户名或邮箱均可登录；密码使用 BCrypt 校验，账号停用时拒绝登录，成功后返回 token、expirationMs 和用户信息。
+- 当前用户：/api/auth/me 从 JWT 的 subject 读取用户 ID，再从数据库加载最新用户状态。
+- 退出登录：提供统一的退出接口响应；由于当前采用无状态 JWT，客户端应删除本地 token。
+
+#### 主数据与报表
+
+- 物料：支持按物料编码或名称关键词分页查询，维护类别、单位、技术指标、单价和安全库存等字段。
+- 供应商：支持按供应商编码或名称关键词分页查询，维护联系人、联系方式、主营物料和资质信息，并可单独修改状态。
+- 采购报表：/api/reports/purchase?year=YYYY 返回统计年份和按物料聚合的明细，数据来自 purchase_order。
+- 数据库启动兼容：SchemaMigration 会幂等补齐旧版本 material.status 字段，并检查演示采购订单种子数据。
+
 ## 目录结构
 
 ```text
@@ -36,14 +53,14 @@ backend/
 └─ src/main/
    ├─ java/com/metallurgy/
    │  ├─ MetallurgyApplication.java  # 应用入口
-   │  ├─ auth/                       # 登录、JWT、角色鉴权
+   │  ├─ auth/                       # 注册、登录、JWT 会话
    │  ├─ common/                     # 统一响应、业务异常、全局异常
    │  ├─ config/                     # Web、CORS、MyBatis-Plus 配置
-   │  ├─ controller/                 # REST 控制器（后续补充）
-   │  ├─ dto/vo/                     # 请求和响应对象（后续补充）
-   │  ├─ entity/                     # 数据库实体（后续补充）
-   │  ├─ mapper/                     # MyBatis-Plus Mapper（后续补充）
-   │  └─ service/                    # 业务服务和事务（后续补充）
+   │  ├─ controller/                 # 认证、物料、供应商、报表 REST 控制器
+   │  ├─ dto/vo/                     # 报表行等请求/响应数据对象
+   │  ├─ entity/                     # 用户、物料、供应商等数据库实体
+   │  ├─ mapper/                     # MyBatis-Plus Mapper 与报表查询
+   │  └─ service/                    # 物料、供应商业务校验与 CRUD
    └─ resources/
       ├─ application.yml             # 服务和数据库配置
       └─ db/
@@ -73,9 +90,30 @@ backend/
   ```
 
 - 业务异常由全局异常处理器统一转换为中文错误响应。
-- 后续分页接口统一采用 `pageNum`、`pageSize` 和业务关键词参数。
+- 分页接口统一采用 `pageNum`、`pageSize` 和可选的 `keyword` 参数。
 
 计划提供的核心接口包括登录、物料和供应商 CRUD、采购计划审批、采购订单、到货检验、入库、出库、库存预警、仪表盘和统计报表。
+
+### 当前接口清单
+
+| 方法 | 路径 | 说明 | 认证 |
+| --- | --- | --- | --- |
+| POST | /api/auth/register | 注册账号 | 否 |
+| POST | /api/auth/login | 用户名/邮箱登录并签发 JWT | 否 |
+| GET | /api/auth/me | 查询当前登录用户 | 是 |
+| POST | /api/auth/logout | 返回退出成功提示 | 是 |
+| GET | /api/materials | 物料分页、关键词查询 | 是 |
+| GET | /api/materials/{id} | 查询物料详情 | 是 |
+| POST/PUT/DELETE | /api/materials[/{id}] | 物料新增、更新、删除 | 是 |
+| GET | /api/suppliers | 供应商分页、关键词查询 | 是 |
+| GET | /api/suppliers/{id} | 查询供应商详情 | 是 |
+| POST/PUT/DELETE | /api/suppliers[/{id}] | 供应商新增、更新、删除 | 是 |
+| PATCH | /api/suppliers/{id}/status | 修改供应商启用状态 | 是 |
+| GET | /api/reports/purchase?year=YYYY | 年度采购聚合报表 | 是 |
+
+认证接口（登录、注册）不要求 Authorization；其余 /api/** 接口默认要求 Authorization: Bearer JWT。分页接口统一采用 pageNum、pageSize 和可选的 keyword 参数，页码和页大小会被限制为至少 1。
+
+所有成功和业务错误均尽量返回 ApiResponse。常见错误码包括：400 参数或年份无效、401 未登录/令牌失效、403 账号停用、404 记录不存在、409 唯一键冲突或记录被引用、503 数据库不可用。
 
 ## 本地运行
 
@@ -114,6 +152,15 @@ mvn spring-boot:run
 默认服务地址为 `http://localhost:8080`。再在另一个终端进入同级 `frontend` 目录运行 `npm run dev`；Vite 会把 `/api` 请求代理到 `http://localhost:8080`。如果 8080 已被其他进程占用，先停止旧后端实例，或通过 `SERVER_PORT` 为后端指定其他端口并同步调整 `frontend/vite.config.js` 代理地址。
 
 注册/登录时报“数据库暂不可用”时，依次确认：MySQL 服务正在运行且 3306 可连接；`DB_URL` 指向正确数据库；`DB_USERNAME`/`DB_PASSWORD` 对应本机账号；已按顺序执行 `schema.sql`、`data.sql`；从 IDE 启动时环境变量已配置在该 IDE 的运行配置中。
+
+### 3. 验证与测试
+
+```bash
+mvn test
+mvn package
+```
+
+测试覆盖认证服务、全局异常处理、数据库兼容迁移、物料/供应商服务、采购报表控制器以及实体映射等关键行为。连接真实数据库的联调前，应先执行建表和演示数据脚本。
 
 ## 后续开发计划
 
